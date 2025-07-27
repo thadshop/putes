@@ -1,0 +1,17 @@
+.bash_history
+.bash_logout
+bin/python
+.cache/
+.config/
+.lesshst
+.links2
+.local/
+__pycache__/
+.python_history
+.ssh/
+.sudo_as_admin_successful
+Scratch/
+.tmp/
+.venv/
+.viminfo
+.wget-hsts

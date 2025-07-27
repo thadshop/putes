@@ -1,0 +1,8 @@
+# This file was created by Thad.
+# It's supposed to be executed when X starts.
+
+echo "$(date) beginning of Thad's .xsessionrc" >> /home/thad/log/tevent.log
+
+#"${HOME}/bin/my_mouse_customization.sh"
+
+echo "$(date) end       of Thad's .xsessionrc" >> /home/thad/log/tevent.log

@@ -1,0 +1,87 @@
+
+export TEVENT_LOG="${HOME}/log/tevent.log"
+echo -e "$(date)\t####-->> Begin tbashrc <<--####" | tee -a "${TEVENT_LOG}" | cut -f2-
+export SSH_AGENT_ENV="${HOME}/.ssh/ssh-agent.env"
+export PYTHONPATH="${HOME}/opt/python"
+
+#export DISPLAY=:0
+
+alias cscratch='cd ~/Scratch'
+
+#PS1="\[\e]0;\w\a\]\n\[\e[32m\]\u@\h:\[\e[33m\]\w\[\e[0m\]\n\s-\v\$ "
+#PS1='\[\e]0;\u@\h:\w\a\]\n\[\e[32m\]\u@\h:\[\e[33m\]\w\[\e[0m\]\n\s-\v$ '
+#PS1=\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$
+PS1='\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\s-\v$ '
+set -o vi
+export VISUAL='vi'
+
+#alias vi='vim'
+alias less='less -X'
+
+# try to make bash like ksh
+alias whence='type'
+alias e='fc -e vi'
+#alias print='echo -e'
+
+# General Unix stuff
+#alias ls='ls' # by default, Bash seems to alias ls='ls -F'; thanks, but no thanks!
+#alias ll='ls -al'
+#alias lll='ls -altr'
+alias lsd='ls -al | grep ^d'
+#alias lsfiles='ls -al | grep -v ^d'
+alias hist='history'
+
+# Miscellaneous stuff
+alias prdts='date "+%Y-%m-%d_%H-%M-%S"'
+alias pyvenv='source ~/opt/pyvenv/bin/activate'
+alias kaiaqi="ssh thad@kona 'tail ~/log/aqi.log'"
+alias snas='ssh root@readynas-anders'
+
+#
+# general Unix stuff
+#
+unalias r 2> /dev/null
+function r {
+    if [[ -z ${1} ]]; then
+        echo "ERROR: argument required"
+        return 1
+    fi
+    echo
+    echo "Press <Enter> to execute or signal interrupt to cancel:"
+    fc -ln "${1}" "${1}"
+    typeset dummy
+    read dummy
+    fc -e - "${1}"
+}
+function lwhich {
+  less "$(which ${1})"
+}
+function pruhf {
+    typeset file
+    if [[ ${1} == /* ]]; then
+        file=${1}
+    else
+        file=${PWD}/${1}
+    fi
+    if [[ -d ${file} && ${file} != */ ]]; then
+        file=${file}/
+    fi
+    echo "$(whoami)@$(hostname):${file}"
+}
+# too bad banner is not available on some platforms, like Linux
+type banner > /dev/null 2>&1 || {
+    function banner {
+        typeset width='                                                         '
+        typeset message=$(echo "${*}" | tr "[:lower:]" "[:upper:]")
+        echo
+        echo " #-------------------------------------------------------------#"
+        echo " #                                                             #"
+        echo " #  ${message}${width:${#message}}  #"
+        echo " #                                                             #"
+        echo " #-------------------------------------------------------------#"
+        echo " #-------------------------------------------------------------#"
+        echo
+    }
+}
+
+echo -e "$(date)\t####-->> End   tbashrc <<--####" | tee -a "${TEVENT_LOG}" | cut -f2-

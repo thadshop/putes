@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# kgpup - "kill gpu process"
+
+# may be called by the following, which are triggered when the system "wakes up" from sleep/hibernate:
+# #> /lib/systemd/system-sleep/hdparm
+# or
+# #> called by /etc/systemd/system/wakeup.service
+
+processRegEx=' --type=gpu-process '
+echo -e "$(date) firing ${0} to kill\n$(ps -fp $(/usr/bin/pgrep -f "${processRegEx}"))\n(end of kill list for ${0})" >> /home/thad/log/tevent.log
+/usr/bin/pkill -f "${processRegEx}"
+
+# conservative kill list:
+#/usr/bin/pkill -f '^/opt/google/chrome/chrome --type=gpu-process '
+#/usr/bin/pkill -f '^/opt/Postman/app/postman --type=gpu-process '
+#/usr/bin/pkill -f '^/usr/share/code/code --type=gpu-process '

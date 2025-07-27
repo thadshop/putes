@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+SOURCE="${HOME}"
+DEST="root@ReadyNAS-anders:/data/Thad/Backups/$(hostname)/"
+EXCLUDE_FROM_FILE="${HOME}/etc/buhome2rnas-exclusions.txt"
+INCLUDE_FROM_FILE="${HOME}/etc/buhome2rnas-inclusions.txt"
+typeset -i MAX_TRIES=4
+TMPLOG=$(mktemp)
+trap 'rm -f "${TMPLOG}"' EXIT
+
+function args() {
+    OPTS=$(getopt --long no-prompt,no-delete,max-tries: -n 'parse-options' -- "${@}")
+    if [[ ${?} != 0 ]] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
+    eval set -- "${OPTS}"
+
+    RSYNC_DELETE_OPT='--delete --delete-excluded'
+
+    while true; do
+        case "${1}" in
+            --no-prompt ) NO_PROMPT=true;       shift ;;
+            --no-delete ) RSYNC_DELETE_OPT='';  shift ;;
+            --max-tries ) MAX_TRIES="${2}";     shift 2 ;;
+            --          ) shift; break ;;
+            *           ) break ;;
+        esac
+    done
+}
+
+args ${0} "${@}"
+
+RSYNC_OPTS="${RSYNC_DELETE_OPT} --include-from=${INCLUDE_FROM_FILE} --exclude-from=${EXCLUDE_FROM_FILE} --verbose --compress --archive --modify-window=2"
+
+# debug
+if [[ $(false) ]] ; then
+    echo "debug: SOURCE=${SOURCE}"
+    echo "debug: DEST=${DEST}"
+    echo "debug: EXCLUDE_FROM_FILE=${EXCLUDE_FROM_FILE}"
+    echo "debug: RSYNC_OPTS=${RSYNC_OPTS}"
+    echo "debug: TMPLOG=${TMPLOG}"
+    read -p "debug Enter 'Y' to continue, or anything else to quit: " PROCEED
+    if [[ ${PROCEED} != 'Y' ]]; then
+        echo 'Abandoning based on response.'
+        exit 0
+    fi
+fi
+
+source "${HOME}/etc/rsync_handle_prompts_validations.source.sh"

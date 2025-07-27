@@ -1,0 +1,12 @@
+Gmail:
+  project_id: flub1dub-default-project
+  auth_uri: https://accounts.google.com/o/oauth2/auth
+  token_uri: https://oauth2.googleapis.com/token
+  auth_provider_x509_cert_url: https://www.googleapis.com/oauth2/v1/certs
+  redirect_uris:
+  - http://localhost
+  krg_svc: gcp-flub1dub
+  token_pickle: /home/thad/.tmp/flub1dub-gmail-token.pickle
+  scopes:
+  - https://www.googleapis.com/auth/gmail.compose
+  from_addr: flub1dub@gmail.com

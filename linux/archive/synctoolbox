@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+typeset -r LOCAL="${HOME}/Toolbox/"
+typeset -r REMOTE="gdrive-thadshop:/Toolbox/"
+typeset -r EXCLUDE_FROM_FILE="${HOME}/etc/synctoolbox-exclusions.txt"
+
+function args() {
+  OPTS=$(getopt --long push,pull,delete,dry-run-only,no-prompt-files -n 'parse-options' -- "${@}")
+    if [[ ${?} != 0 ]] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
+    eval set -- "${OPTS}"
+
+    RCLONE_CMD='copy'
+    unset PUSH PULL DRY_RUN_ONLY NO_PROMPT_FILES
+
+    while true; do
+        case "${1}" in
+            --push            ) PUSH=true;            shift ;;
+            --pull            ) PULL=true;            shift ;;
+            --delete          ) RCLONE_CMD='sync';    shift ;;
+            --dry-run-only    ) DRY_RUN_ONLY=true;    shift ;;
+            --no-prompt-files ) NO_PROMPT_FILES=true; shift ;;
+            --                ) shift; break ;;
+            *                 ) break ;;
+        esac
+    done
+}
+
+args ${0} "${@}"
+
+if [[ ${PUSH} && ${PULL} ]]; then
+    echo 'Only one of the options --push or --pull may be set.' >&2
+    exit 1
+elif [[ ${PUSH} ]]; then
+    SOURCE="${LOCAL}"
+    DEST="${REMOTE}"
+elif [[ ${PULL} ]]; then
+    SOURCE="${REMOTE}"
+    DEST="${LOCAL}"
+else
+    echo 'Either one of the options --push or --pull must be set.' >&2
+    exit 1
+fi
+
+RCLONE_OPTS="--exclude-from=${EXCLUDE_FROM_FILE} --create-empty-src-dirs"
+
+
+echo "Dry run, SOURCE=${SOURCE}"
+echo "Dry run, DEST=${DEST}"
+echo "Dry run, RCLONE_CMD=${RCLONE_CMD}"
+echo "Dry run, rclone options: ${RCLONE_OPTS} --log-level=INFO"
+rclone --dry-run ${RCLONE_CMD} "${SOURCE}" "${DEST}" ${RCLONE_OPTS} --log-level=INFO
+if [[ ${?} -ne 0 ]]; then
+    echo 'Exiting due to error.'
+    exit 1
+fi
+if [[ -z ${DRY_RUN_ONLY} ]]; then
+    read -p "Enter 'Y' to proceed with the rclone, or anything else to quit: " PROCEED
+    if [[ ${PROCEED} != 'Y' ]]; then
+        echo 'Quitting based on response.'
+        exit 0
+    fi
+    if [[ ${NO_PROMPT_FILES} ]]; then
+        RCLONE_OPTS="${RCLONE_OPTS} --log-level=INFO"
+    else
+        RCLONE_OPTS="${RCLONE_OPTS} --interactive"
+    fi
+    rclone ${RCLONE_CMD} "${SOURCE}" "${DEST}" ${RCLONE_OPTS}
+fi

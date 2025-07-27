@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+trap "{
+    echo -e \"ERROR: exiting '${0}' due to error\" >&2
+    exit 1
+}" ERR
+
+source "${HOME}/etc/handle_ssh-agent.source.sh"
+source "${HOME}/opt/pyvenv/bin/activate" && python "${HOME}/opt/python/krgmgr.py"
+

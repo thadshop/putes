@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+typeset -r DEVICE_LISTING_REGEX='\S   \S TPPS/2 IBM TrackPoint\s+id=[1-9][0-9]*\s+\[slave\s+pointer\s+\([0-9]+\)\]'
+typeset -r DEVICE_MONIKER='TrackPoint'
+
+source "${HOME}/etc/xinput_device-toggle.source.sh"
+

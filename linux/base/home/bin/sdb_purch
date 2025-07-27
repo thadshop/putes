@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+echo "INFO: begin $(basename "${0}") at $(date)"
+source /home/thad/devl/tda/.venv/bin/activate
+python /home/thad/devl/tda/purch_alloc.py
+echo "INFO: end $(basename "${0}") at $(date)"
+

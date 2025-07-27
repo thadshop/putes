@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#!/data/data/com.termux/files/usr/bin/bash
+
+REMOTE='gdrive-thadshop:data/Obsidian/'
+case $(uname -o) in
+    'GNU/Linux' ) LOCAL="${HOME}/Documents/Obsidian/" ;;
+    'Android'   ) LOCAL="${HOME}/storage/shared/Documents/Obsidian/" ;;
+    *           ) echo "unexpected operating system $(uname -o), bailing out" >&2 ; exit 1 ;;
+esac
+case ${1} in
+    'push'  ) SOURCE="${LOCAL}"; DEST="${REMOTE}" ;;
+    'pull'  ) SOURCE="${REMOTE}"; DEST="${LOCAL}" ;;
+    *       ) echo "positional argument 1 must be either 'push' or 'pull'" >&2 ; exit 1 ;;
+esac
+case ${2} in
+    'delete'  ) RCLONE_CMD='sync' ;;
+    *         ) RCLONE_CMD='copy' ;;
+esac
+
+echo "Dry run, SOURCE=${SOURCE}"
+echo "Dry run, DEST=${DEST}"
+echo "Dry run, RCLONE_CMD=${RCLONE_CMD}"
+rclone --dry-run ${RCLONE_CMD} "${SOURCE}" "${DEST}"
+if [[ ${?} -ne 0 ]]; then
+    echo 'Exiting due to error.' >&2
+    exit 1
+fi
+read -p "Enter 'Y' to proceed with the rclone, or anything else to quit: " proceed
+if [[ ${proceed} != 'Y' ]]; then
+    echo 'Quitting based on response.'
+    exit 0
+fi
+rclone --interactive ${RCLONE_CMD} "${SOURCE}" "${DEST}"

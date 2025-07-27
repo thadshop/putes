@@ -1,0 +1,14 @@
+# This is Thad's custom xbindkeysrc file
+# To start xbindkeys with this rc file: `xbindkeys --file <name of this file>`
+#
+# Note that xbindkeys tends to start on its own if file ~/.xbindkeysrc exists.
+#   To get xbindkeys not to start on its own, any of the following ought to work:
+#      #> Make it so that no ~/.xbindkeysrc file exists
+#      #> Create a file ~/.xbindkeys.noauto (with no content in the file, not sure what hapens if it has content)
+#
+
+# The following configuration uses the `xinput set-button-map ...` action from my ~/bin/my_mouse_customization.sh
+"/usr/bin/xte 'mouseclick 1' 'mouseclick 1' &"
+   b:16 + Release
+
+# end of file
