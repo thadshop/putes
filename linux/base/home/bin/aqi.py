@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 import smtplib
 import optparse
 import sys
+import keyring
 
 def main():
     op = optparse.OptionParser()
@@ -20,7 +21,7 @@ def main():
     url = "https://api.purpleair.com/v1/sensors/86279?read_key=0NEE91YWQQYUTJCK"
     payload={}
     headers = {
-    'X-API-Key': '3461DD66-5111-11EB-9893-42010A8001E8'
+    'X-API-Key': keyring.get_password('purpleair', 'read')
     }
     response = requests.request("GET", url, headers=headers, data=payload)
     timestamp = datetime.now()
