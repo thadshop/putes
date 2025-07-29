@@ -1,2 +1,1 @@
 alias kaiaqi="ssh thad@kona 'tail ~/log/aqi.log'"
-
