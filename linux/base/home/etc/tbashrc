@@ -34,7 +34,6 @@ alias hist='history'
 # Miscellaneous stuff
 alias prdts='date "+%Y-%m-%d_%H-%M-%S"'
 alias pyvenv='source ~/opt/pyvenv/bin/activate'
-alias kaiaqi="ssh thad@kona 'tail ~/log/aqi.log'"
 alias snas='ssh root@readynas-anders'
 
 #
