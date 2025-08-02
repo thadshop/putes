@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 export PYTHONPATH="${HOME}/opt/python"
+SENSOR="Kai's house"
 THRESHOLD=12
 function args() {
-    OPTS=$(getopt --long threshold: -n 'parse-options' -- "${@}")
+    OPTS=$(getopt --long sensor:,threshold: -n $(basename "${0}") -- "${@}")
     if [[ ${?} != 0 ]] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
     eval set -- "${OPTS}"
 
@@ -11,9 +12,10 @@ function args() {
 
     while true; do
         case "${1}" in
-            --threshold ) THRESHOLD="${2}";     shift 2 ;;
-            --          ) shift; break ;;
-            *           ) break ;;
+            --threshold ) THRESHOLD="${2}"  ;   shift 2 ;;
+            --sensor    ) SENSOR="${2}"     ;   shift 2 ;;
+            --          ) shift             ;   break   ;;
+            *           ) break             ;;
         esac
     done
 }
@@ -22,5 +24,5 @@ args ${0} "${@}"
 
 HUSH=true
 source "${HOME}/etc/handle_ssh-agent.source.sh"
-"${HOME}/bin/python" "${HOME}/opt/python/aqi.py" --threshold="${THRESHOLD}"
-
+source "${HOME}/opt/pyvenv/bin/activate"
+"${HOME}/opt/pyvenv/bin/python" "${HOME}/opt/python/aqi.py" --sensor="${SENSOR}" --threshold="${THRESHOLD}"
