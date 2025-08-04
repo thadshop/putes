@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
-import requests
+"""Use the PurpleAir API to query the AQI for a given sensor
+and optionally alert if it exceeds a threshold."""
+
 import json
 from datetime import datetime
-import optparse
+from argparse import ArgumentParser
 import sys
+import requests
 import keyring
 import google_cloud
 
@@ -12,21 +15,28 @@ sensor_indices = {
     "Kai's house": "86279",
     "fox den": "85859"
 }
-notification_email = '4153126347@vtext.com'
+NOTIFICATION_EMAIL = '4153126347@vtext.com'
 work_days = range (0, 4)   # Monday to Friday
 work_hours = range (8, 17) # 8 AM to 4:59 PM
-work_email = 'thad.anders@autodesk.com'
+WORK_EMAIL = 'thad.anders@autodesk.com'
 
 def main():
-    op = optparse.OptionParser()
-
-    threshold_aqi = 12
-    op.add_option("-t", "--threshold", action="store", dest="threshold", help="threshold AQI for alerting")
-    op.add_option("-i", "--index", action="store", dest="index", help="sensor index to query")
-    op.add_option("-s", "--sensor", action="store", dest="sensor", help="sensor name to query")
-    (opt, arg) = op.parse_args()
-    if opt.threshold:
-        threshold_aqi = opt.threshold
+    """Main function to query AQI and send notifications if needed."""
+    ap = ArgumentParser(description="Query PurpleAir sensor AQI "
+        "and alert if it exceeds a threshold."
+    )
+    ap.add_argument("-i", "--index", action="store", dest="index",
+        help="sensor index to query"
+    )
+    ap.add_argument("-s", "--sensor", action="store", dest="sensor",
+        help="sensor name to query"
+    )
+    ap.add_argument("-t", "--threshold", action="store", dest="threshold",
+        help="threshold AQI for alerting"
+    )
+    args = ap.parse_args()
+    if args.threshold:
+        threshold_aqi = args.threshold
         try:
             threshold_aqi = int(threshold_aqi)
         except ValueError:
@@ -34,24 +44,29 @@ def main():
             sys.exit(1)
     else:
         threshold_aqi = None
-    if opt.sensor:
-        sensor_name = opt.sensor
+    if args.sensor:
+        sensor_name = args.sensor
         if sensor_name in sensor_indices:
             sensor_index = sensor_indices[sensor_name]
         else:
-            print(f"ERROR: Unknown sensor name '{sensor_name}'. Valid names are: {sensor_indices.keys()}")
+            print(f"ERROR: Unknown sensor name '{sensor_name}'. "
+                "Valid names are: {sensor_indices.keys()}")
             sys.exit(1)
     else:
-        if opt.index:
-                sensor_index = opt.index
+        if args.index:
+            sensor_index = args.index
         else:
-                sensor_index = "86279"
-        sensor_name = next((k for k, v in sensor_indices.items() if v == sensor_index), None) or f'sensor index {sensor_index}'
+            sensor_index = "86279"
+        sensor_name = next(
+            (k for k, v in sensor_indices.items() if v == sensor_index), None
+            or f'sensor index {sensor_index}'
+        )
     response = requests.get(
         url='https://api.purpleair.com/v1/sensors/' + sensor_index,
         headers={'X-API-Key': keyring.get_password('purpleair', 'x_api_key')},
         data={},
-        params={'read_key': keyring.get_password('purpleair', 'read_key')}
+        params={'read_key': keyring.get_password('purpleair', 'read_key')},
+        timeout=15
     )
     timestamp = datetime.now()
     #print(f'DEBUG: response.txt: "{response.text}"')
@@ -60,9 +75,9 @@ def main():
     if threshold_aqi and aqi > threshold_aqi:
         message += f' exceeding threshold {threshold_aqi}'
         print(message)
-        to_list = [notification_email]
+        to_list = [NOTIFICATION_EMAIL]
         if timestamp.weekday() in work_days and timestamp.hour in work_hours:
-            to_list.append(work_email)
+            to_list.append(WORK_EMAIL)
         gmail = google_cloud.Gmail()
         gmail.send_message(
             to_addr=', '.join(to_list),
@@ -70,7 +85,7 @@ def main():
             body=message
         )
     else:
-         print(message)
+        print(message)
 
 if __name__ == '__main__':
     sys.exit(main())
