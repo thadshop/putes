@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-export PYTHONPATH="${HOME}/opt/python"
-SENSOR="Kai's house"
-THRESHOLD=12
+# This script sets up the environment to run ${HOME}/bin/aqi.py
+
 function args() {
     OPTS=$(getopt --long sensor:,threshold: -n $(basename "${0}") -- "${@}")
     if [[ ${?} != 0 ]] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
@@ -25,4 +24,4 @@ args ${0} "${@}"
 HUSH=true
 source "${HOME}/etc/handle_ssh-agent.source.sh"
 source "${HOME}/opt/pyvenv/bin/activate"
-"${HOME}/opt/pyvenv/bin/python" "${HOME}/opt/python/aqi.py" --sensor="${SENSOR}" --threshold="${THRESHOLD}"
+"${HOME}/opt/pyvenv/bin/python" "${HOME}/bin/aqi.py" --sensor="${SENSOR}" --threshold="${THRESHOLD}"
