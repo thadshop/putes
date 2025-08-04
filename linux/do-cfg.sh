@@ -66,18 +66,13 @@ if [[ -r "${cfgfile}" ]]; then
     while read lf; do
         l=$(echo ${lf} | cut -d' ' -f1)
         f=$(echo ${lf} | cut -d' ' -f2)
-        #echo "line = ${l}"
-        #echo "file = ${f}"
         src="${srcdir}/home/${f}"
         tgt="${tgtdir}/${f}"
-        #echo "tgt = ${src}"
-        #echo "tgt = ${tgt}"
         if [[ -n $(echo "${l}" | egrep '^[+-][0-9]+') && -f "${src}" && -f "${tgt}" ]]; then
-            if [[ "$(grep -Ff "${src}" "${tgt}")" = "$(cat "${src}")" ]]; then
+            if awk -f "$(dirname $0)/find_file1_in_file2.awk" "${src}" "${tgt}" ; then
                 echo "matching ${f}"
             else
                 tgt_lines=$(wc -l < ${tgt})
-                #echo "tgt_lines = ${tgt_lines}"
                 sedop=''
                 if [[ $(echo ${l} | cut -c1) = '+' ]]; then
                     sedop="$(echo ${l} | cut -c2-)a"
@@ -85,8 +80,10 @@ if [[ -r "${cfgfile}" ]]; then
                     sedop="$(( ${tgt_lines} - $(echo ${l} | cut -c2-) ))r"
                 fi
                 if [[ -n ${sedop} ]]; then
-                    #echo "sedop = ${sedop}"
                     sed -i "${sedop} "${src}"" "${tgt}"
+                    if [[ ${l} == '-0' ]]; then
+                        echo >> "${tgt}"
+                    fi
                     echo "inserted ${lf}"
                 else
                     echo "ERROR: failed to derive sed operand from \"${lf}\""
