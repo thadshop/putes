@@ -6,9 +6,6 @@ function args() {
     OPTS=$(getopt --long sensor:,threshold: -n $(basename "${0}") -- "${@}")
     if [[ ${?} != 0 ]] ; then echo "Failed parsing options." >&2 ; exit 1 ; fi
     eval set -- "${OPTS}"
-
-    RSYNC_DELETE_OPT='--delete --delete-excluded'
-
     while true; do
         case "${1}" in
             --threshold ) THRESHOLD="${2}"  ;   shift 2 ;;
