@@ -3,6 +3,6 @@
 
 echo "$(date) beginning of Thad's .xsessionrc" >> /home/thad/log/tevent.log
 
-#"${HOME}/bin/my_mouse_customization.sh"
+# Commands to run when X starts go here.
 
 echo "$(date) end       of Thad's .xsessionrc" >> /home/thad/log/tevent.log
