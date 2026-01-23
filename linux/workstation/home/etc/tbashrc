@@ -1,1 +1,2 @@
+export VM_MSWIN=win11
 alias kaiaqi="ssh thad@kona 'tail ~/log/aqi.log'"
