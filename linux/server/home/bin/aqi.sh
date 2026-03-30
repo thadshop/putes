@@ -18,7 +18,7 @@ function args() {
 
 args ${0} "${@}"
 
-HUSH=true
-source "${HOME}/etc/handle_ssh-agent.source.sh"
+source "${HOME}/lib/bash/handle_ssh_agent.bash"
+handle_ssh_agent
 source "${HOME}/opt/pyvenv/bin/activate"
 "${HOME}/opt/pyvenv/bin/python" "${HOME}/bin/aqi.py" --sensor="${SENSOR}" --threshold="${THRESHOLD}"
