@@ -93,4 +93,5 @@ Templates/
 Toolbox/
 Upgrade-Backup-tricia/
 virt/**/*.iso
+virt/win11/win11-dump.xml
 VirtualBox VMs/
