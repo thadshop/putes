@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-source "${HOME}/etc/handle_ssh-agent.source.sh"
+source "${HOME}/lib/bash/handle_ssh_agent.bash"
+handle_ssh_agent -v
 source "${HOME}/opt/pyvenv/bin/activate"
 export PYTHONPATH="${HOME}/opt/python"
 python "${HOME}/bin/sendmail.py" "${@}"
