@@ -1,5 +1,4 @@
 source "${HOME}/lib/bash/handle_ssh_agent.bash"
-handle_ssh_agent
 
 unalias r 2> /dev/null
 function r {
