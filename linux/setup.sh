@@ -76,10 +76,11 @@ write_file() {
     fi
 }
 
-# Paths under home/ that are assembled by assemble_etc_bash_rc — not copied verbatim.
+# Paths under etc/bash/rc/*.bash are assembled by assemble_etc_bash_rc — not copied verbatim.
+# Other names under etc/bash/rc/ (e.g. README.txt) are copied normally by deploy_home_tree.
 skip_home_deploy_rel() {
     local rel="${1}"
-    [[ "${rel}" == etc/bash/rc/* ]]
+    [[ "${rel}" == etc/bash/rc/*.bash ]]
 }
 
 ensure_home_rel_dir() {
@@ -216,6 +217,39 @@ deploy_home_tree() {
     fi
 }
 
+# Remove ~/etc/bash/rc/*.bash that are no longer defined under base/home/etc/bash/rc/.
+# Run before assemble_etc_bash_rc so stale names are cleared, then assembly writes only current fragments.
+# Renames (e.g. functions.bash -> 30.functions.bash) leave stale files; ~/.bashrc sources
+# all *.bash, so leftovers still run and can duplicate side effects.
+prune_obsolete_etc_bash_rc() {
+    local -a base_files=("${base_home}/etc/bash/rc/"*.bash)
+    local -A expected=()
+    local f name had_nullglob
+
+    if [[ ! -f "${base_files[0]}" ]]; then
+        echo "ERROR: no *.bash files found in \"${base_home}/etc/bash/rc\"" >&2
+        exit 1
+    fi
+
+    for f in "${base_files[@]}"; do
+        [[ -f "${f}" ]] || continue
+        expected["${f##*/}"]=1
+    done
+
+    run_cmd mkdir -p "${tgtdir}/etc/bash/rc"
+
+    had_nullglob=0
+    shopt -q nullglob && had_nullglob=1
+    shopt -s nullglob
+    for f in "${tgtdir}/etc/bash/rc/"*.bash; do
+        name="${f##*/}"
+        [[ -n "${expected[${name}]}" ]] && continue
+        echo "INFO: removing obsolete etc/bash/rc fragment \"${f}\" (not in linux/base/home/etc/bash/rc/)"
+        run_cmd rm -f "${f}"
+    done
+    [[ "${had_nullglob}" -eq 0 ]] && shopt -u nullglob
+}
+
 # cat base fragment > ~/etc/bash/rc/<name>.bash; cat profile fragment >> same (if present).
 # Files are discovered from base/etc/bash/rc/*.bash in lexical order (numeric prefix controls sequence).
 # Each fragment is preceded by a comment identifying its source in the repo.
@@ -276,6 +310,7 @@ echo "INFO: putes setup profile=\"${profile}\"; target \"${tgtdir}\""
 deploy_home_tree "base" "${base_home}" "linux/base/home"
 deploy_home_tree "${profile}" "${prof_home}" "linux/${profile}/home"
 
+prune_obsolete_etc_bash_rc
 assemble_etc_bash_rc
 
 # ~/.bashrc: optional comment snippets (repo) + /etc/skel + optional + source ~/etc/bash/rc/*.bash
