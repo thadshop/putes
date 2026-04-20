@@ -13,6 +13,7 @@ __pycache__/
 .config/***
 .continue/
 .copilot/
+.cursor/
 .dbus/
 .dmrc
 .dotnet/
