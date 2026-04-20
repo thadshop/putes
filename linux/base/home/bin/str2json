@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# str2json: Convert a string to JSON format.
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    printf '%s\n' "Usage: ${0} <file | ->" >&2
+    exit 1
+fi
+
+input="${1}"
+
+json_encode_stdin() {
+    python -c \
+        'import sys, json; print(json.dumps(sys.stdin.read()))'
+}
+
+if [[ "${input}" == "-" ]]; then
+    json_encode_stdin
+else
+    if [[ ! -f "${input}" ]]; then
+        printf '%s\n' "Error: file not found: ${input}" >&2
+        exit 1
+    fi
+    cat -- "${input}" | json_encode_stdin
+fi
