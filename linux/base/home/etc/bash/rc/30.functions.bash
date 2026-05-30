@@ -1,5 +1,6 @@
 source "${HOME}/lib/bash/handle_ssh_agent.bash"
 
+# Thad's ol' stuff
 unalias r 2> /dev/null
 function r {
     if [[ -z ${1} ]]; then

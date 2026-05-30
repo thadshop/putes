@@ -14,3 +14,6 @@ export SSH_AGENT_ENV="${HOME}/.ssh/ssh-agent.env"
 export PYTHONPATH="${HOME}/opt/python"
 export PYENV_ROOT="${HOME}/.pyenv"
 [[ -d ${PYENV_ROOT}/bin ]] && export PATH="${PYENV_ROOT}/bin:${PATH}"
+
+# for util:
+export SECCONFIG_DIR=~/etc/secconfig

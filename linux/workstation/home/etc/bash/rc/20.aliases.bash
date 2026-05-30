@@ -1,2 +1,3 @@
 alias kaiaqi="ssh thad@kona 'tail ~/log/aqi.log'"
 alias update-all='echo "---  APT UPDATE:" && sudo apt update && echo "---  APT UPGRADABLE:" && apt list --upgradable && echo "---  APT UPGRADE:" && sudo apt upgrade --autoremove && echo "---  FLATPAK UPDATE:" && flatpak update && echo "---  CINNAMON SPICE UPDATE:" && cinnamon-spice-updater --update-all'
+alias tokm='~/opt/util/tokmint/.venv/bin/python -m tokmint 2>&1 | ~/opt/util/tokmint/.venv/bin/python -m tokmint.jsonl_fmt -ac'
