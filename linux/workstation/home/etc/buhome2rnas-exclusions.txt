@@ -85,6 +85,7 @@ mbox
 nobak/
 opt/AppImages/
 opt/pyvenv/
+opt/util/
 Public/
 Scratch/
 share/
