@@ -17,13 +17,17 @@
 set -u
 set -o pipefail
 
+# Stable parsing of apt/snap output across locales.
+export LC_ALL=C
+
 readonly SCRIPT_NAME=${0##*/}
 readonly CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/ubuntu-cruft
 readonly KEEP_FILE=$CONFIG_DIR/keep
 readonly KERNEL_KEEP_FALLBACKS=1   # advise retaining this many non-running kernels
 readonly JOURNAL_VACUUM_SIZE=200M
 
-MODE=apply          # report | apply
+MODE=report         # report | apply  (section commands flip to apply unless --report)
+EXPLICIT_MODE=0     # 1 if user passed --report or --apply
 JSON_SUMMARY=0
 INCLUDE_DEBORPHAN=0
 INCLUDE_SLOW=0      # disk du / large manual pkgs in report+all when set
@@ -67,8 +71,8 @@ Commands (default: report):
 
 Options:
   -h, --help          Show this help
-  --apply             Allow interactive fixes (implied by section commands
-                      other than report; report stays read-only)
+  --apply             Allow interactive fixes (implied by mutating section
+                      commands unless --report was given)
   --report            Force report-only even with section commands
   --json-summary      Print a JSON summary object at the end
   --deborphan         Include deborphan in report/all
@@ -89,6 +93,13 @@ ask() {
     [[ $MODE == report ]] && return 1
     read -r -p "$1 [y/N] " reply
     [[ $reply =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+# Mutating section commands default to apply; --report keeps them read-only.
+prefer_apply() {
+    if (( ! EXPLICIT_MODE )); then
+        MODE=apply
+    fi
 }
 
 shell_join() {
@@ -125,8 +136,23 @@ suite_from_os() {
     printf '%s' "${VERSION_CODENAME:-}"
 }
 
+ubuntu_suite_from_os() {
+    # On Mint/derivatives, Ubuntu package suites use UBUNTU_CODENAME (e.g. noble).
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    printf '%s' "${UBUNTU_CODENAME:-}"
+}
+
+is_known_current_suite() {
+    local suite=$1
+    [[ -n $suite && ( $suite == "$current_suite" || ( -n $ubuntu_suite && $suite == "$ubuntu_suite" ) ) ]]
+}
+
 running_kernel=$(uname -r)
+# ABI without flavor, e.g. 6.8.0-63-generic → 6.8.0-63 (arch-independent headers).
+running_kernel_base=${running_kernel%-*}
 current_suite=$(suite_from_os)
+ubuntu_suite=$(ubuntu_suite_from_os)
 
 # --- keep list -------------------------------------------------------------
 
@@ -200,15 +226,23 @@ cmd_keep() {
 
 is_protected_kernel_package() {
     local pkg=$1
+    # Protect the running kernel's packages (flavor + ABI-common headers),
+    # plus common metapackages (generic / virtual / HWE / OEM).
     case "$pkg" in
         linux-image-"$running_kernel"|\
         linux-image-unsigned-"$running_kernel"|\
         linux-modules-"$running_kernel"|\
         linux-modules-extra-"$running_kernel"|\
         linux-headers-"$running_kernel"|\
-        linux-headers-generic|\
-        linux-image-generic|\
-        linux-generic)
+        linux-headers-"$running_kernel_base"|\
+        linux-tools-"$running_kernel"|\
+        linux-generic|linux-generic-*|\
+        linux-image-generic|linux-image-generic-*|\
+        linux-headers-generic|linux-headers-generic-*|\
+        linux-virtual|linux-virtual-*|\
+        linux-image-virtual|linux-image-virtual-*|\
+        linux-headers-virtual|linux-headers-virtual-*|\
+        linux-oem-*|linux-image-oem-*|linux-headers-oem-*)
             return 0
             ;;
     esac
@@ -227,8 +261,26 @@ apt_shows_removals() {
     grep -Eq '^(Remv|Purg) |^[0-9]+ upgraded, [0-9]+ newly installed, [1-9][0-9]* to remove' <<<"$1"
 }
 
-# Run apt-get --simulate; in apply mode, offer to execute.
-# Returns 0 if simulation ok (whether or not anything was removed).
+apt_needs_privilege() {
+    # True when apt failed for lock/permissions (retry with sudo is reasonable).
+    grep -Eq 'Permission denied|are you root|Unable to acquire .*lock' <<<"$1"
+}
+
+# Run read-only apt-get; escalate only if the non-root attempt hits a lock/perm error.
+apt_get_ro() {
+    local output rc
+    output=$(apt-get "$@" 2>&1)
+    rc=$?
+    if (( rc != 0 )) && apt_needs_privilege "$output"; then
+        note "Retrying with sudo (APT lock/permissions)..."
+        output=$(sudo apt-get "$@" 2>&1)
+        rc=$?
+    fi
+    printf '%s\n' "$output"
+    return "$rc"
+}
+
+# Run apt-get --simulate without sudo when possible. In apply mode, offer real run.
 apt_simulate_and_offer() {
     local description=$1
     shift
@@ -237,7 +289,7 @@ apt_simulate_and_offer() {
 
     section "$description"
     # Place "--" only before package names in cmd, never before the subcommand.
-    output=$(sudo apt-get --simulate "${cmd[@]}" 2>&1)
+    output=$(apt_get_ro --simulate "${cmd[@]}")
     rc=$?
     printf '%s\n' "$output"
     if (( rc != 0 )); then
@@ -305,7 +357,10 @@ cmd_summary() {
     printf 'Host:             %s\n' "$(hostname)"
     # shellcheck source=/dev/null
     printf 'Ubuntu/Debian:    %s\n' "$(. /etc/os-release; printf '%s (%s)' "$PRETTY_NAME" "${VERSION_CODENAME:-unknown}")"
-    printf 'Running kernel:   %s\n' "$running_kernel"
+    if [[ -n $ubuntu_suite && $ubuntu_suite != "$current_suite" ]]; then
+        printf 'Ubuntu suite:     %s (package repos)\n' "$ubuntu_suite"
+    fi
+    printf 'Running kernel:   %s (ABI %s)\n' "$running_kernel" "$running_kernel_base"
     printf 'Root filesystem:  %s\n' "$(df -hP / | awk 'NR==2 {print $3 " used of " $2 " (" $5 ")"}')"
     printf 'Mode:             %s\n' "$MODE"
     printf 'Keep list:        %s\n' "$KEEP_FILE"
@@ -313,14 +368,20 @@ cmd_summary() {
 
 cmd_health() {
     section "Package database health"
-    if sudo dpkg --audit; then
+    # dpkg --audit is read-only without root.
+    if dpkg --audit; then
         info "No incomplete or broken package states were reported."
     else
         warn "dpkg reported a problem. Resolve that before optional cleanup."
         record_finding "dpkg audit issues"
     fi
 
-    if ! sudo apt-get check; then
+    # apt-get check often needs the dpkg lock; try plain, then sudo if required.
+    local check_out check_rc
+    check_out=$(apt_get_ro check)
+    check_rc=$?
+    printf '%s\n' "$check_out"
+    if (( check_rc != 0 )); then
         error "APT dependency check failed. Repair this before cleanup."
         record_finding "apt-get check failed"
         if [[ $MODE == apply ]]; then
@@ -395,6 +456,7 @@ cmd_local() {
     fi
 
     warn "May be old-release/PPA leftovers, or intentional local .deb packages."
+    note "Related packages (e.g. python3.9 + libpython3.9-*) are often best reviewed as a group; APT simulation shows dependency fallout before any removal."
     printf '%-42s %12s  %s\n' "PACKAGE" "SIZE" "VERSION"
     local pkg
     for pkg in "${local_packages[@]}"; do
@@ -407,9 +469,9 @@ cmd_local() {
 
 cmd_kernels() {
     section "Installed kernels"
-    printf 'Running: %s\n' "$running_kernel"
-    printf 'Policy:  never remove the running kernel; retain ≥ %s known-good fallback(s).\n' \
-        "$KERNEL_KEEP_FALLBACKS"
+    printf 'Running: %s (ABI base %s)\n' "$running_kernel" "$running_kernel_base"
+    printf 'Policy:  never remove the running kernel or its headers/modules/metapackages;\n'
+    printf '         retain ≥ %s known-good fallback kernel image(s).\n' "$KERNEL_KEEP_FALLBACKS"
     printf 'Prefer:  apt autoremove for old kernels over manual linux-image removal.\n\n'
 
     dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${Version}\n' \
@@ -462,6 +524,7 @@ cmd_deborphan() {
 
 cmd_sources() {
     section "APT source files and release names"
+    # Heuristic codename list; extend when Ubuntu/Debian add releases.
     local known_suites=(
         trusty xenial bionic focal jammy noble oracular plucky questing resolute
         stretch buster bullseye bookworm trixie forky
@@ -470,15 +533,20 @@ cmd_sources() {
     local stale=0
     shopt -s nullglob
     local source_files=(/etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources)
-    local file suite
+    local file suite active_lines
     for file in "${source_files[@]}"; do
         [[ -f $file ]] || continue
         printf '\n%s\n' "$file"
-        grep -Ev '^[[:space:]]*(#|$)' "$file" 2>/dev/null || true
+        active_lines=$(grep -Ev '^[[:space:]]*(#|$)' "$file" 2>/dev/null || true)
+        printf '%s\n' "$active_lines"
         for suite in "${known_suites[@]}"; do
-            if [[ -n $current_suite && $suite != "$current_suite" ]] &&
-                grep -Eq "(^|[[:space:]/])${suite}([[:space:]/-]|$)" "$file"; then
-                warn "Mentions '$suite'; current suite is '$current_suite'. Review manually."
+            if ! is_known_current_suite "$suite" &&
+                grep -Eq "(^|[[:space:]/])${suite}([[:space:]/-]|$)" <<<"$active_lines"; then
+                if [[ -n $ubuntu_suite && $ubuntu_suite != "$current_suite" ]]; then
+                    warn "Mentions '$suite'; distro suite is '$current_suite' (Ubuntu suite '$ubuntu_suite'). Review manually."
+                else
+                    warn "Mentions '$suite'; current suite is '$current_suite'. Review manually."
+                fi
                 stale=1
             fi
         done
@@ -532,7 +600,11 @@ cmd_cache() {
 
 cmd_journal() {
     section "systemd journal"
-    sudo journalctl --disk-usage || true
+    # Prefer non-root; escalate only if needed.
+    if ! journalctl --disk-usage; then
+        note "Retrying journalctl --disk-usage with sudo..."
+        sudo journalctl --disk-usage || true
+    fi
 
     if [[ $MODE == report ]]; then
         note "Report mode. Apply with: $SCRIPT_NAME journal"
@@ -616,8 +688,25 @@ cmd_pyenv() {
 cmd_disk() {
     section "Largest top-level directories on the root filesystem"
     warn "Read-only; can take a while on large disks."
-    sudo du -x -h --max-depth=1 / 2>/dev/null | sort -h
+    if [[ $MODE == report ]]; then
+        # Avoid sudo in report mode; unreadable dirs are skipped.
+        note "Report mode runs without sudo; sizes may omit inaccessible directories."
+        du -x -h --max-depth=1 / 2>/dev/null | sort -h
+    else
+        sudo du -x -h --max-depth=1 / 2>/dev/null | sort -h
+    fi
     warn "Diagnostic only; not deletion targets."
+}
+
+json_escape() {
+    # Escape a string for JSON (labels are plain ASCII in practice).
+    local s=$1
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    s=${s//$'\n'/\\n}
+    s=${s//$'\r'/\\r}
+    s=${s//$'\t'/\\t}
+    printf '%s' "$s"
 }
 
 print_summary() {
@@ -637,12 +726,10 @@ print_summary() {
     fi
 
     if (( JSON_SUMMARY )); then
-        local labels_json=""
-        local i first=1
-        labels_json='['
+        local labels_json='['
+        local i first=1 escaped
         for (( i = 0; i < ${#FINDING_LABELS[@]}; i++ )); do
-            local escaped=${FINDING_LABELS[i]//\\/\\\\}
-            escaped=${escaped//\"/\\\"}
+            escaped=$(json_escape "${FINDING_LABELS[i]}")
             if (( first )); then first=0; else labels_json+=','; fi
             labels_json+="\"$escaped\""
         done
@@ -722,10 +809,12 @@ while (( $# )); do
             ;;
         --apply)
             MODE=apply
+            EXPLICIT_MODE=1
             shift
             ;;
         --report)
             MODE=report
+            EXPLICIT_MODE=1
             shift
             ;;
         --json-summary)
@@ -770,23 +859,23 @@ case "$COMMAND" in
         run_all
         ;;
     health)
-        MODE=apply
+        prefer_apply
         cmd_summary
         cmd_health
         print_summary
         ;;
     residual)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_residual
         print_summary
         ;;
     autoremove)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_autoremove
         print_summary
         ;;
     local)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_local
         print_summary
         ;;
@@ -806,17 +895,17 @@ case "$COMMAND" in
         print_summary
         ;;
     cache)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_cache
         print_summary
         ;;
     journal)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_journal
         print_summary
         ;;
     snaps)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_snaps
         print_summary
         ;;
@@ -826,12 +915,15 @@ case "$COMMAND" in
         print_summary
         ;;
     disk)
-        MODE=report
+        # honor --apply for full sudo du; default stays report-friendly
+        if (( EXPLICIT_MODE == 0 )); then
+            MODE=report
+        fi
         cmd_disk
         print_summary
         ;;
     deborphan)
-        [[ $MODE == report ]] || MODE=apply
+        prefer_apply
         cmd_deborphan
         print_summary
         ;;
